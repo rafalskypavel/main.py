@@ -1,11 +1,32 @@
 import requests
 from bs4 import BeautifulSoup
-import pandas
+import pandas as pd
 import time
 from requests.exceptions import ConnectTimeout
 
-URLS = "https://pnevmex.ru/brands/camozzi/"
+URLS = [
 
+    "https://pnevmex.ru/catalog/bloki-podgotovki-vozduha/bloki-podgotovki-vozduha-camozzi/",
+    "https://pnevmex.ru/catalog/pnevmaticheskie-raspredeliteli/firma-camozzi/",
+    "https://pnevmex.ru/catalog/elektromagnitnye-katushki-i-razemy/solenoidy-dlya-raspredelitelej-camozzi-cerij-a-ap-cfb-3-4-9-na/",
+    "https://pnevmex.ru/catalog/drosseli-pnevmaticheskie/drosseli-pnevmaticheskie-camozzi/",
+    "https://pnevmex.ru/catalog/glushiteli-pnevmaticheskie/glushiteli-pnevmaticheskie-camozzi/",
+    "https://pnevmex.ru/catalog/pnevmocilindry-i-elektrocilindry/camozzi/",
+    "https://pnevmex.ru/catalog/pnevmaticheskie-truboprovody/pnevmaticheskie-truboprovody-camozzi/",
+    "https://pnevmex.ru/catalog/fitingi/fitingi-camozzi/",
+    "https://pnevmex.ru/catalog/datchiki-i-rele/datchiki-i-rele-camozzi/",
+    "https://pnevmex.ru/catalog/funkcionalnye-klapany-i-logicheskie-elementy/avtomaticheskie-klapany-i-logicheskie-elementy-camozzi/",
+    "https://pnevmex.ru/catalog/manometry-pnevmaticheskie/manometry-pnevmaticheskie-camozzi/",
+    "https://pnevmex.ru/catalog/remkomplekty-dlya-pnevmocilindrov-i-raspredelitelej/remkomplekty-dlya-pnevmocilindrov-i-raspredelitelej-camozzi/",
+    "https://pnevmex.ru/catalog/proporcionalnaya-tehnika/proporcionalnaya-tehnika-camozzi/",
+    "https://pnevmex.ru/catalog/vakuumnaya-tehnika/vakuumnaya-tehnika-camozzi/",
+    "https://pnevmex.ru/catalog/pnevmaticheskie-shvaty/pnevmaticheskie-shvaty-camozzi/",
+    "https://pnevmex.ru/catalog/solenoidnye-klapany/solenoidnye-klapany-camozzi--serii-cfb--5946/",
+    "https://pnevmex.ru/catalog/pnevmoupravlyaemye--otsechnye-i-perezhimnye-klapany/pnevmoupravlyaemye-otsechnye-klapany-camozzi--seriya-cka/",
+    "https://pnevmex.ru/catalog/sharovye-krany/sharovye-krany-camozzi/",
+    "https://pnevmex.ru/catalog/privody-pnevmaticheskie-povorotnye/pnevmoprivody-camozzi-povorotnye-seriya-ca/",
+
+]
 cards = []
 
 
@@ -53,7 +74,6 @@ def get_content(html):
             'Единица измерения': unit,
             'Цена без НДС': price,
         })
-    return cards
 
 
 def get_page_count(url):
@@ -69,66 +89,65 @@ def get_page_count(url):
     return 1
 
 
-def parse_subgroup(url, visited_urls):
+def parse_subgroup(url, visited_urls, parsed_urls):
     # Если URL уже посещен, выходим из функции
     if url in visited_urls:
         return
 
-    # Добавляем URL в список посещенных
     visited_urls.add(url)
 
-    # Получаем HTML-код страницы
     html = get_html(url)
 
-    # Если статус ответа 200 (успешный запрос)
     if html.status_code == 200:
-        # Выводим информацию о парсинге текущей страницы
         print(f'Парсинг страницы: {url}')
 
-        # Извлекаем данные со страницы
         get_content(html)
 
-        # Выводим общее количество товаров
         print(f'Всего: {len(cards)} позиций')
 
-        # Проверяем наличие пагинации на подстраницах
         soup = BeautifulSoup(html.text, 'html.parser')
         pagination = soup.find('div', {'class': 'pagination'})
         if pagination is not None:
             pages = pagination.findAll('a')
-            # Перебираем каждую страницу пагинации
             for page in pages:
-                # Формируем URL страницы
                 page_url = 'https://pnevmex.ru' + page['href']
-                # Исключаем повторный парсинг текущей страницы
-                if page_url != url:
-                    # Рекурсивно вызываем функцию parse_subgroup() для парсинга следующей страницы пагинации
-                    parse_subgroup(page_url, visited_urls.copy())
+                if page_url != url and page_url not in parsed_urls:
+                    parse_subgroup(page_url, visited_urls.copy(), parsed_urls)
 
-        # Рекурсивно вызываем функцию parse_subgroup() для парсинга подгрупп
         itemsLevel = soup.findAll('div', {'class': 'type'})
         for item in itemsLevel:
             print("Опустились в подгруппу ", item.text.strip())
             subgroup_url = 'https://pnevmex.ru' + item.find('a', {'class': 'type-link'}).get('href')
             print(subgroup_url, " Ссылка на группу: ", item.text.strip())
-            parse_subgroup(subgroup_url, visited_urls.copy())
+            subgroup_pages = get_page_count(subgroup_url)
+            if subgroup_pages > 1:
+                parse_subgroup(subgroup_url, visited_urls.copy(), parsed_urls)
+            else:
+                parse_subgroup(subgroup_url, visited_urls.copy(), parsed_urls)
+
+        parsed_urls.add(url)
 
     else:
         print(f'Ответ сервера: {html.status_code}. Парсинг невозможен!')
 
 
 def parser(url):
-    """Функция парсинга"""
     visited_urls = set()
-    parse_subgroup(url, visited_urls)
+    parsed_urls = set()
+    parse_subgroup(url, visited_urls, parsed_urls)
 
 
 if __name__ == "__main__":
     start_time = time.time()
-    parser(URLS)
+
+    for url in URLS:
+        parser(url)
+
     end_time = time.time()
     execution_time = end_time - start_time
-    print(f"Время выполнения: {execution_time} секунд")
-    dataframe = pandas.DataFrame(cards)
-    with pandas.ExcelWriter("pnevmex.xlsx", mode="a", engine="openpyxl", if_sheet_exists="overlay") as writer:
-        dataframe.to_excel(writer, sheet_name='pnevmex')
+    execution_time_minutes = execution_time / 60
+
+    print(f"Время выполнения: {execution_time_minutes} минут")
+
+    dataframe = pd.DataFrame(cards)
+    dataframe.to_excel("pnevmex.xlsx", sheet_name='pnevmex', index=False)
