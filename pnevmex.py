@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 from requests.exceptions import ConnectTimeout
+import concurrent.futures
+
 
 URLS = [
 
@@ -140,8 +142,9 @@ def parser(url):
 if __name__ == "__main__":
     start_time = time.time()
 
-    for url in URLS:
-        parser(url)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Запуск парсинга в нескольких потоках
+        executor.map(parser, URLS)
 
     end_time = time.time()
     execution_time = end_time - start_time
